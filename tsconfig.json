@@ -1,0 +1,35 @@
+{
+  "compilerOptions": {
+      "target": "ESNext",
+      "module": "ESNext",
+      "lib": ["dom", "dom.iterable", "esnext"],
+      "allowJs": true,
+      "outDir": "./build",
+      "importHelpers": true,
+
+      "strict": true,
+      "strictNullChecks": true,
+      "strictFunctionTypes": true,
+      "alwaysStrict": true,
+
+      "noUnusedLocals": true,
+      "noUnusedParameters": true,
+      "noFallthroughCasesInSwitch": true,
+
+      "moduleResolution": "node",
+      "allowSyntheticDefaultImports": true,
+      "esModuleInterop": true,
+
+      "pretty": true,
+
+      "skipLibCheck": true,
+      "forceConsistentCasingInFileNames": true,
+      "useUnknownInCatchVariables": false,
+
+      "resolveJsonModule": true,
+      "isolatedModules": true,
+      "noEmit": true,
+      "jsx": "react-jsx"
+  },
+  "include": ["src"]
+}
