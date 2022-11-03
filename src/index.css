@@ -1,0 +1,74 @@
+html {
+    margin: 0px;
+}
+body {
+    background-color: #222527;
+    font-family: 'Lexend Deca', sans-serif;
+    color: #f1e9e9;
+    height: 100%;
+    margin: 0px;
+}
+button {
+    font-family: 'Lexend Deca', sans-serif;
+    color: #f1e9e9;
+    cursor: pointer;
+}
+::-webkit-scrollbar {
+    height: 10px;
+    width: 10px;
+}
+::-webkit-scrollbar-track {
+    background: #222527;
+}
+::-webkit-scrollbar-thumb {
+    background: #555;
+    border-radius: 15px;
+}
+::-webkit-scrollbar-thumb:hover {
+    background: #444;
+}
+#root {
+    height: 100%;
+    width: 100%;
+    margin: 0px;
+}
+.loader,
+.loader:before,
+.loader:after {
+    border-radius: 50%;
+    width: 2em;
+    height: 2em;
+    -webkit-animation-fill-mode: both;
+    animation-fill-mode: both;
+    -webkit-animation: load7 1s infinite ease-in-out;
+    animation: load7 1s infinite ease-in-out;
+}
+.loader {
+    color: #ffffff;
+    font-size: 10px;
+    margin: 80px auto;
+    position: relative;
+    text-indent: -9999em;
+    -webkit-transform: translateZ(0);
+    -ms-transform: translateZ(0);
+    transform: translateZ(0);
+    -webkit-animation-delay: -0.16s;
+    animation-delay: -0.16s;
+}
+.loader:before,
+.loader:after {
+    content: '';
+    position: absolute;
+    top: 0;
+}
+.loader:before {
+    left: -3.5em;
+    -webkit-animation-delay: -0.32s;
+    animation-delay: -0.32s;
+}
+.loader:after {
+    left: 3.5em;
+}
+.btn-transition {
+    transition: 0.25s ease-out;
+}
