@@ -1,0 +1,33 @@
+.app-left-sidebar {
+    min-width: 250px;
+    background-color: #2a2d2f;
+    color: #f1e9e9;
+}
+.app-left-sidebar-friends {
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+}
+.app-left-sidebar-friends > img {
+    height: 35px;
+    margin-left: 20px;
+    margin-right: 10px;
+}
+.app-left-sidebar-friends > p {
+    font-size: 22px;
+}
+.friend-details {
+    display: flex;
+    align-items: center;
+    width: 100%;
+}
+.friend-details > img {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    margin-right: 10px;
+}
+.friend-details > p {
+    margin: 0;
+    font-size: 18px;
+}

@@ -9,9 +9,42 @@ body {
     margin: 0px;
 }
 button {
+    background: 0 0;
+    border: none;
+    font-size: inherit;
+    color: inherit;
     font-family: 'Lexend Deca', sans-serif;
-    color: #f1e9e9;
     cursor: pointer;
+    background-color: #09a6e2;
+    border-radius: 5px;
+    padding: 15px;
+    height: 50px;
+    min-width: 120px;
+    margin-left: 10px;
+    transition: 0.25s ease-out;
+}
+button:hover {
+    background-color: #0584b5;
+}
+input[type='number'],
+input[type='text'],
+textarea {
+    background-color: #2a2d2f;
+    font-family: inherit;
+    color: #f1e9e9;
+    font-size: 20px;
+    padding-left: 15px;
+    height: 50px;
+    width: 100% !important;
+    border-radius: 15px !important;
+    transition: border 0.15s ease-out;
+    border: 3px solid #474747;
+    resize: none;
+}
+input:focus,
+textarea:focus {
+    border: 3px solid #09a6e2;
+    outline: none;
 }
 ::-webkit-scrollbar {
     height: 10px;

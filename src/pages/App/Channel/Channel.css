@@ -1,0 +1,16 @@
+.msg-channel {
+    width: 100%;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    background-color: #313538;
+}
+.msg-channel-msgs-div {
+    overflow: auto;
+}
+.msg-channel-msgs-div > div > div {
+    display: flex;
+}
+.msg-channel-send-msg-div {
+    display: flex;
+}

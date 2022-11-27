@@ -3,7 +3,7 @@
         "target": "ESNext",
         "module": "Node16",
         "allowJs": true,
-        "outDir": "./dist",
+        "outDir": "../dist",
         "importHelpers": true,
 
         "strict": true,
