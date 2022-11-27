@@ -27,13 +27,13 @@ export const websiteUtils = {
             }, 5000);
         };
 
-        ws.addEventListener('message', (msg) => {
+        ws.onmessage = (msg) => {
             const message = JSON.parse(msg.data);
 
             for (const wsMessageListener of wsMessageListeners) {
                 if (window.location.href === wsMessageListener[0]) wsMessageListener[1](message);
             }
-        });
+        };
     },
     heartbeat: () => {
         ws.send(JSON.stringify({ op: WebSocketOP.PING }));
