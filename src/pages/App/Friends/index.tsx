@@ -18,8 +18,6 @@ const Friends = () => {
     const [usernameToSendFriendRequest, setUsernameToSendFriendRequest] = useState('');
 
     useEffect(() => {
-        console.log(1);
-
         (async () => {
             const friendsData = (await superagent.get(`/api/friends`)).body;
 

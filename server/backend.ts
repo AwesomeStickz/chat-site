@@ -10,6 +10,7 @@ import path from 'path';
 import { constants } from '../src/utils/constants';
 import { db } from './database';
 import { routers } from './routers';
+import './websocket';
 
 export const uid = new Snowflake({ custom_epoch: 0 });
 

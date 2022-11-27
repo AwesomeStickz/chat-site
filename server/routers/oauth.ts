@@ -40,6 +40,7 @@ router.get('/google/callback', async (req, res) => {
 
             res.cookie('loggedIn', 'true', { maxAge: 7 * 24 * 60 * 60 * 1000 });
             res.cookie('username', userDataFromDB.username);
+            res.cookie('id', userDataFromDB.id);
 
             res.redirect(`${constants.frontendBaseURL}/app`);
         } else {

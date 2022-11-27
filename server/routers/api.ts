@@ -1,8 +1,10 @@
 import { NextFunction, Request, Response, Router } from 'express';
 import rateLimit from 'express-rate-limit';
 import { constants } from '../../src/utils/constants';
+import { WebSocketOP } from '../../src/utils/websocketEvents';
 import { uid } from '../backend';
 import { db } from '../database';
+import { serverUtils } from '../utils/serverUtils';
 
 export const router = Router();
 
@@ -41,6 +43,7 @@ router.post('/register', makeRateLimiter(15), async (req, res) => {
     req.session.user.username = username;
 
     res.cookie('loggedIn', 'true', { maxAge: 7 * 24 * 60 * 60 * 1000 });
+    res.cookie('id', req.session.user.id, { maxAge: 7 * 24 * 60 * 60 * 1000 });
 
     sendResponse(res, 200);
 });
@@ -169,15 +172,104 @@ router.post('/channels/:channelID/messages', makeRateLimiter(60), handleAuthoriz
         )
     ).rows[0].users as string[];
 
+    const message = {
+        id: uid.getUniqueID().toString(),
+        channelID,
+        authorID: req.session.user.id,
+        content,
+        sentAt: Date.now(),
+    };
+
     await db.query(
         `
             INSERT INTO messages (id, channel_id, author_id, content, sent_at, unread_users)
             VALUES ($1, $2, $3, $4, $5, $6);
         `,
-        [uid.getUniqueID().toString(), channelID, req.session.user.id, content, Date.now(), [usersInThisChannel.filter((userID) => userID !== req.session.user.id)]]
+        [...Object.values(message), usersInThisChannel.filter((userID) => userID !== req.session.user.id)]
     );
 
     sendResponse(res, 200);
+
+    // Send Message in WS
+    for (const userID of usersInThisChannel) serverUtils.sendWSMessageToUser(userID, { op: WebSocketOP.MESSAGE_CREATE, d: message });
+});
+
+router.put('/channels/:channelID/messages/:messageID', makeRateLimiter(60), handleAuthorizationCheck, async (req, res) => {
+    const { messageID } = req.params;
+    if (!req.body.content || typeof req.body.content !== 'string') return sendResponse(res, 400);
+
+    const message = (
+        await db.query(
+            `
+                SELECT *
+                FROM messages
+                WHERE id = $1;
+            `,
+            [messageID]
+        )
+    ).rows[0];
+
+    if (!message) return sendResponse(res, 404);
+
+    if (message.author_id !== req.session.user.id) return sendResponse(res, 403);
+
+    await db.query(
+        `
+            UPDATE messages
+            SET content = $1, edited_at = $2
+            WHERE id = $3;
+        `,
+        [req.body.content, Date.now(), messageID]
+    );
+
+    sendResponse(res, 200);
+
+    // Send Message in WS
+    for (const userID of message.users) serverUtils.sendWSMessageToUser(userID, { op: WebSocketOP.MESSAGE_UPDATE, d: { id: messageID, content: req.body.content } });
+});
+
+router.delete('/channels/:channelID/messages/:messageID', makeRateLimiter(60), handleAuthorizationCheck, async (req, res) => {
+    const { messageID } = req.params;
+    if (typeof messageID !== 'string') return sendResponse(res, 400);
+
+    const message = (
+        await db.query(
+            `
+                SELECT *
+                FROM messages
+                WHERE id = $1;
+            `,
+            [messageID]
+        )
+    ).rows[0];
+
+    if (!message) return sendResponse(res, 404);
+
+    if (message.author_id !== req.session.user.id) return sendResponse(res, 403);
+
+    await db.query(
+        `
+            DELETE FROM messages
+            WHERE id = $1;
+        `,
+        [messageID]
+    );
+
+    sendResponse(res, 200);
+
+    // Send Message in WS
+    const usersInThisChannel = (
+        await db.query(
+            `
+                SELECT users
+                FROM channels
+                WHERE id = $1;
+            `,
+            [message.channel_id]
+        )
+    ).rows[0].users as string[];
+
+    for (const userID of usersInThisChannel) serverUtils.sendWSMessageToUser(userID, { op: WebSocketOP.MESSAGE_DELETE, d: { id: messageID } });
 });
 
 router.get('/friends', makeRateLimiter(60), handleAuthorizationCheck, async (req, res) => {
