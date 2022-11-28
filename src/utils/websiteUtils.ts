@@ -1,16 +1,17 @@
 import cookies from 'js-cookie';
 import { constants } from './constants';
-import { WebSocketOP } from './websocketEvents';
+import { WebSocketEvent, WebSocketOP } from './websocketEvents';
 
 let ws: WebSocket;
-const wsMessageListeners = new Map<string, Function>();
+
+export const wsMessageListeners = new Map<string, Function>();
 
 export const websiteUtils = {
-    connectToWS: (setIsLoaded: Function) => {
-        ws = new WebSocket(constants.websocketURL);
+    connectToWS: (setIsLoaded: Function, setUnreadData: Function) => {
+        if (!ws || !ws.OPEN) ws = new WebSocket(constants.websocketURL);
 
         ws.onopen = () => {
-            ws.send(JSON.stringify({ op: WebSocketOP.HELLO, d: { id: cookies.get('id') } }));
+            ws.send(JSON.stringify({ op: WebSocketOP.HELLO, d: { id: cookies.get('id'), sessionID: cookies.get('connect.sid') } }));
 
             setIsLoaded(true);
 
@@ -22,23 +23,40 @@ export const websiteUtils = {
         ws.onclose = () => {
             setIsLoaded(false);
 
-            setTimeout(() => {
-                websiteUtils.connectToWS(setIsLoaded);
-            }, 5000);
+            setTimeout(() => window.location.reload(), 3000);
         };
 
         ws.onmessage = (msg) => {
-            const message = JSON.parse(msg.data);
+            const message = JSON.parse(msg.data) as WebSocketEvent;
 
-            for (const wsMessageListener of wsMessageListeners) {
-                if (window.location.href === wsMessageListener[0]) wsMessageListener[1](message);
-            }
+            if (message.op === WebSocketOP.HELLO) setUnreadData(message.d);
+
+            for (const wsMessageListener of wsMessageListeners) wsMessageListener[1](message);
         };
     },
     heartbeat: () => {
         ws.send(JSON.stringify({ op: WebSocketOP.PING }));
     },
-    attachMessageListenerToWS: (href: string, func: Function) => {
-        wsMessageListeners.set(href, func);
+    // PascalCase cuz React errors otherwise for using useLayoutEffect
+    attachMessageListenerToWS: (func: Function) => {
+        const id = websiteUtils.generateRandomChars(64);
+
+        wsMessageListeners.set(id, func);
+
+        return id;
+    },
+    sendMessageToWS: (message: WebSocketEvent) => {
+        ws.send(JSON.stringify(message));
+    },
+    generateRandomChars: (length: number) => {
+        let result = '';
+        const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+        const charactersLength = characters.length;
+
+        for (let i = 0; i < length; i++) {
+            result += characters.charAt(Math.floor(Math.random() * charactersLength));
+        }
+
+        return result;
     },
 };

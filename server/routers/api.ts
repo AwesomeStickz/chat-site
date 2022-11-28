@@ -52,7 +52,9 @@ router.get('/channels', makeRateLimiter(60), handleAuthorizationCheck, async (re
     const channels = (
         await db.query(
             `
-                SELECT *
+                SELECT
+                    *,
+                    last_active_at AS "lastActiveAt"
                 FROM channels
                 WHERE $1 = ANY(users);
             `,
@@ -95,7 +97,9 @@ router.get('/channels/:channelID', makeRateLimiter(60), handleAuthorizationCheck
     const channel = (
         await db.query(
             `
-                SELECT *
+                SELECT
+                    *,
+                    last_active_at AS "lastActiveAt"
                 FROM channels
                 WHERE id = $1;
             `,
@@ -128,6 +132,16 @@ router.get('/channels/:channelID', makeRateLimiter(60), handleAuthorizationCheck
     channel.users = channel.users.map((userID: string) => users.find((user) => user.id === userID));
 
     sendResponse(res, 200, channel);
+
+    // Ack Messages
+    await db.query(
+        `
+            UPDATE messages
+            SET unread_users = array_remove(unread_users, $1)
+            WHERE channel_id = $2;
+        `,
+        [req.session.user.id, channelID]
+    );
 });
 
 router.get('/channels/:channelID/messages', makeRateLimiter(60), handleAuthorizationCheck, async (req, res) => {
@@ -186,6 +200,15 @@ router.post('/channels/:channelID/messages', makeRateLimiter(60), handleAuthoriz
             VALUES ($1, $2, $3, $4, $5, $6);
         `,
         [...Object.values(message), usersInThisChannel.filter((userID) => userID !== req.session.user.id)]
+    );
+
+    await db.query(
+        `
+            UPDATE channels
+            SET last_active_at = $1
+            WHERE id = $2;
+        `,
+        [message.sentAt, channelID]
     );
 
     sendResponse(res, 200);
@@ -330,33 +353,41 @@ router.patch('/friends/:username', makeRateLimiter(60), handleAuthorizationCheck
 
     const op = req.body.op;
 
-    const userID = (
-        await db.query(
-            `
-                SELECT id
+    const userData =
+        (
+            await db.query(
+                `
+                SELECT
+                    id,
+                    avatar
                 FROM users
                 WHERE username = $1;
             `,
-            [username]
-        )
-    ).rows[0]?.id;
+                [username]
+            )
+        ).rows[0] || {};
+
+    const userID = userData.id;
 
     if (!userID || userID === req.session.user.id) return sendResponse(res, 400);
 
     if (op === 'add') {
-        const friends =
+        const friendsInfo =
             (
                 await db.query(
                     `
-                        SELECT friends
+                        SELECT
+                            friends,
+                            friend_requests AS "friendRequests",
+                            avatar
                         FROM users
                         WHERE id = $1;
                     `,
-                    [req.session.user.id]
+                    [userID]
                 )
-            ).rows[0]?.friends || [];
+            ).rows[0] || {};
 
-        if (friends.includes(userID)) return sendResponse(res, 403);
+        if (friendsInfo.friends?.includes(req.session.user.id) || friendsInfo.friendRequests?.includes(req.session.user.id)) return sendResponse(res, 403);
 
         await db.query(
             `
@@ -368,6 +399,35 @@ router.patch('/friends/:username', makeRateLimiter(60), handleAuthorizationCheck
         );
 
         sendResponse(res, 200);
+
+        const senderAvatar = (
+            await db.query(
+                `
+                    SELECT avatar
+                    FROM users
+                    WHERE id = $1;
+                `,
+                [req.session.user.id]
+            )
+        ).rows[0].avatar;
+
+        // Send Message in WS
+        for (const id of [userID, req.session.user.id])
+            serverUtils.sendWSMessageToUser(id, {
+                op: WebSocketOP.FRIEND_REQ_SEND,
+                d: {
+                    sender: {
+                        id: req.session.user.id,
+                        username: req.session.user.username,
+                        avatar: senderAvatar,
+                    },
+                    receiver: {
+                        id: userID,
+                        username: userData.username,
+                        avatar: userData.avatar,
+                    },
+                },
+            });
     } else if (op === 'remove') {
         await db.query(
             `
@@ -392,20 +452,32 @@ router.patch('/friends/:username', makeRateLimiter(60), handleAuthorizationCheck
         );
 
         sendResponse(res, 200);
+
+        // Send Message in WS
+        for (const id of [userID, req.session.user.id])
+            serverUtils.sendWSMessageToUser(id, {
+                op: WebSocketOP.FRIEND_REQ_DELETE,
+                d: {
+                    sender: { id: req.session.user.id },
+                    receiver: { id: userID },
+                },
+            });
     } else if (op === 'accept') {
-        const friends =
+        const friendsInfo =
             (
                 await db.query(
                     `
-                        SELECT friends
+                        SELECT
+                            friends,
+                            avatar
                         FROM users
                         WHERE id = $1;
                     `,
                     [req.session.user.id]
                 )
-            ).rows[0]?.friends || [];
+            ).rows[0] || {};
 
-        if (friends.includes(userID)) return sendResponse(res, 403);
+        if (friendsInfo.friends.includes(userID)) return sendResponse(res, 403);
 
         await db.query(
             `
@@ -445,16 +517,47 @@ router.patch('/friends/:username', makeRateLimiter(60), handleAuthorizationCheck
 
             await db.query(
                 `
-                    INSERT INTO channels (id, users, name, icon, type)
-                    VALUES ($1, $2, $3, $4, $5)
+                    INSERT INTO channels (id, users, name, icon, last_active_at, type)
+                    VALUES ($1, $2, $3, $4, $5, $6)
                     ON CONFLICT (id)
                     DO NOTHING;
                 `,
-                [channelID, [req.session.user.id, userID], null, null, 'dm']
+                [channelID, [req.session.user.id, userID], null, null, Date.now(), 'dm']
             );
+
+            // Send Message in WS
+            for (const id of [userID, req.session.user.id])
+                serverUtils.sendWSMessageToUser(id, {
+                    op: WebSocketOP.CHANNEL_CREATE,
+                    d: {
+                        id: channelID,
+                        users: [req.session.user.id, userID],
+                        name: id === userID ? username : req.session.user.username,
+                        icon: id === userID ? userData.avatar : friendsInfo.avatar,
+                        type: 'dm',
+                    },
+                });
         }
 
         sendResponse(res, 200);
+
+        // Send Message in WS
+        for (const id of [userID, req.session.user.id])
+            serverUtils.sendWSMessageToUser(id, {
+                op: WebSocketOP.FRIEND_REQ_ACCEPT,
+                d: {
+                    sender: {
+                        id: req.session.user.id,
+                        username: req.session.user.username,
+                        avatar: friendsInfo.avatar,
+                    },
+                    receiver: {
+                        id: userID,
+                        username,
+                        avatar: userData.avatar,
+                    },
+                },
+            });
     } else if (op === 'reject') {
         await db.query(
             `
@@ -466,6 +569,16 @@ router.patch('/friends/:username', makeRateLimiter(60), handleAuthorizationCheck
         );
 
         sendResponse(res, 200);
+
+        // Send Message in WS
+        for (const id of [userID, req.session.user.id])
+            serverUtils.sendWSMessageToUser(id, {
+                op: WebSocketOP.FRIEND_REQ_REJECT,
+                d: {
+                    sender: { id: req.session.user.id },
+                    receiver: { id: userID },
+                },
+            });
     }
 });
 

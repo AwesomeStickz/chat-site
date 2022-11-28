@@ -3,6 +3,7 @@ export interface Channel {
     users: User[];
     name: string;
     icon: string;
+    lastActiveAt: number;
     type: 'dm' | 'group';
 }
 

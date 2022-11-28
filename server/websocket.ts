@@ -4,7 +4,7 @@ import { WebSocketEvent, WebSocketOP } from '../src/utils/websocketEvents';
 import { uid } from './backend';
 import { db } from './database';
 
-export const wsConnections = new Map<string, { id: string; ws: WebSocket; lastPing: number }[]>();
+export const wsConnections = new Map<string, { id: string; sessionID: string; ws: WebSocket; lastPing: number }[]>();
 
 const wss = new WebSocketServer({
     port: constants.websocketPort,
@@ -46,11 +46,15 @@ wss.on('connection', (ws) => {
 
         switch (msg.op) {
             case WebSocketOP.HELLO: {
-                const { id } = msg.d;
+                const { id, sessionID } = msg.d;
 
                 const connsForThisUser = wsConnections.get(id) || [];
 
-                connsForThisUser.push({ id: ids.ws, ws, lastPing: Date.now() });
+                for (const con of connsForThisUser) {
+                    if (con.sessionID === sessionID) con.ws.close();
+                }
+
+                connsForThisUser.push({ id: ids.ws, sessionID, ws, lastPing: Date.now() });
 
                 wsConnections.set(id, connsForThisUser);
                 ids.user = id;
@@ -98,6 +102,20 @@ wss.on('connection', (ws) => {
                 wsConnections.set(ids.user, connsForThisUser);
 
                 break;
+            }
+            case WebSocketOP.ACK_MESSAGES: {
+                const { channelID } = msg.d;
+
+                await db.query(
+                    `
+                        UPDATE messages
+                        SET unread_users = array_remove(unread_users, $1)
+                        WHERE channel_id = $2;
+                    `,
+                    [ids.user, channelID]
+                );
+
+                ws.send(JSON.stringify({ op: WebSocketOP.ACK_MESSAGES_RECEIVED, d: { channelID } }));
             }
         }
     });
