@@ -146,6 +146,7 @@ router.get('/channels/:channelID', makeRateLimiter(60), handleAuthorizationCheck
 
 router.get('/channels/:channelID/messages', makeRateLimiter(60), handleAuthorizationCheck, async (req, res) => {
     const { channelID } = req.params;
+    const { content } = req.query;
 
     const messages = (
         await db.query(
@@ -155,14 +156,15 @@ router.get('/channels/:channelID/messages', makeRateLimiter(60), handleAuthoriza
                     channel_id AS "channelID",
                     author_id AS "authorID",
                     content,
+                    file,
+                    file_name AS "fileName",
                     sent_at AS "sentAt",
                     edited_at AS "editedAt"
                 FROM messages
-                WHERE channel_id = $1
-                ORDER BY sent_at DESC
-                LIMIT 100;
+                WHERE channel_id = $1${content ? ' AND content LIKE $2' : ''}
+                ORDER BY sent_at DESC;
             `,
-            [channelID]
+            content ? [channelID, `%${content}%`] : [channelID]
         )
     ).rows;
 
@@ -171,9 +173,18 @@ router.get('/channels/:channelID/messages', makeRateLimiter(60), handleAuthoriza
 
 router.post('/channels/:channelID/messages', makeRateLimiter(60), handleAuthorizationCheck, async (req, res) => {
     const { channelID } = req.params;
-    const { content } = req.body;
+    const { content, file, fileName } = req.body;
 
-    if (!content) return sendResponse(res, 400);
+    if (!content && !file) return sendResponse(res, 400);
+    if (file) {
+        if (!fileName) return sendResponse(res, 400);
+
+        const base64Length = file.length - (file.indexOf(',') + 1);
+        const padding = file.charAt(file.length - 2) === '=' ? 2 : file.charAt(file.length - 1) === '=' ? 1 : 0;
+        const fileSize = base64Length * 0.75 - padding;
+
+        if (fileSize / 1024 / 1024 > 100) return sendResponse(res, 400);
+    }
 
     const usersInThisChannel = (
         await db.query(
@@ -190,14 +201,16 @@ router.post('/channels/:channelID/messages', makeRateLimiter(60), handleAuthoriz
         id: uid.getUniqueID().toString(),
         channelID,
         authorID: req.session.user.id,
-        content,
+        content: content.trim(),
+        file,
+        fileName,
         sentAt: Date.now(),
     };
 
     await db.query(
         `
-            INSERT INTO messages (id, channel_id, author_id, content, sent_at, unread_users)
-            VALUES ($1, $2, $3, $4, $5, $6);
+            INSERT INTO messages (id, channel_id, author_id, content, file, file_name, sent_at, unread_users)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8);
         `,
         [...Object.values(message), usersInThisChannel.filter((userID) => userID !== req.session.user.id)]
     );
@@ -267,7 +280,6 @@ router.delete('/channels/:channelID/messages/:messageID', makeRateLimiter(60), h
     ).rows[0];
 
     if (!message) return sendResponse(res, 404);
-
     if (message.author_id !== req.session.user.id) return sendResponse(res, 403);
 
     await db.query(

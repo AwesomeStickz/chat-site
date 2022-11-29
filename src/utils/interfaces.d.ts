@@ -11,7 +11,9 @@ export interface Message {
     id: string;
     channelID: string;
     authorID: string;
-    content: string;
+    content?: string;
+    file?: string;
+    fileName?: string;
     sentAt: string;
     editedAt?: string;
 }

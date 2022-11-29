@@ -1,3 +1,4 @@
+import cookies from 'js-cookie';
 import { useEffect, useLayoutEffect, useState } from 'react';
 import { withRouter } from 'react-router-dom';
 import superagent from 'superagent';
@@ -13,14 +14,47 @@ const Channel = (props: any) => {
     const [isLoading, setIsLoading] = useState(true);
     const [channel, setChannel] = useState({} as ChannelInterface);
     const [messages, setMessages] = useState([] as Message[]);
+
     const [newMessageContent, setNewMessageContent] = useState('');
+    const [newMessageFile, setNewMessageFile] = useState({ name: '', data: '' });
 
     const [wsMessageListenerID, setWSMessageListenerID] = useState('');
 
     const sendMessage = async () => {
-        setNewMessageContent('');
+        if (newMessageContent.length === 0 && newMessageFile.name.length === 0) return;
 
-        await superagent.post(`/api/channels/${channelID}/messages`).send({ content: newMessageContent });
+        await superagent.post(`/api/channels/${channelID}/messages`).send({
+            content: newMessageContent,
+            file: newMessageFile.name.length === 0 ? null : newMessageFile.data,
+            fileName: newMessageFile.name.length === 0 ? null : newMessageFile.name,
+        });
+
+        setNewMessageContent('');
+        setNewMessageFile({ name: '', data: '' });
+    };
+
+    const handleSelectFile = () => {
+        const fileSelectorElement = document.createElement('input');
+
+        fileSelectorElement.setAttribute('type', 'file');
+
+        fileSelectorElement.addEventListener('change', () => {
+            if (fileSelectorElement.files?.length) {
+                const reader = new FileReader();
+                reader.readAsDataURL(fileSelectorElement.files[0]);
+
+                reader.onload = () => {
+                    if (typeof reader.result !== 'string') return;
+
+                    // TODO: Erorr message
+                    // if (fileSelectorElement.files![0].size / 1024 / 1024 > 100) return setPopupMessage('Please select a file whose size is less than or equal to 10MB!');
+
+                    setNewMessageFile({ name: fileSelectorElement.files![0].name, data: reader.result });
+                };
+            }
+        });
+
+        fileSelectorElement.click();
     };
 
     useEffect(() => {
@@ -62,9 +96,16 @@ const Channel = (props: any) => {
         <Loader occupyFullScreen={true} />
     ) : (
         <div className='msg-channel'>
-            <div className='msg-channel-header friend-details'>
-                <img src={channel.icon} alt='channel icon' referrerPolicy='no-referrer' />
-                <p>{channel.name}</p>
+            <div className='msg-channel-header'>
+                <div className='friend-details' style={{ marginLeft: '10px' }}>
+                    <img src={channel.icon} alt='channel icon' referrerPolicy='no-referrer' />
+                    <p>{channel.name}</p>
+                </div>
+                <div className='msg-channel-header-right-side'>
+                    <img src='/assets/voice-call-icon.png' alt='voice call' style={{ width: '35px', cursor: 'pointer' }} />
+                    <img src='/assets/video-call-icon.png' alt='video call' style={{ width: '30px', marginLeft: '10px', cursor: 'pointer' }} />
+                    <input type='text' placeholder='Search' style={{ marginLeft: '10px' }} />
+                </div>
             </div>
             <div className='msg-channel-msgs-div'>
                 {groupMessagesByUser(messages)?.map((messageGroup, index) => {
@@ -78,14 +119,75 @@ const Channel = (props: any) => {
                                 <p>• {getMessageDisplayDate(new Date(Number(messageGroup[0].sentAt)))}</p>
                             </div>
                             {messageGroup.map((message, index) => (
-                                <p key={index}>{message.content}</p>
+                                <div
+                                    key={index}
+                                    className='msg-channel-msg-div'
+                                    id={`msg-${message.id}-div`}
+                                    onMouseOver={() => {
+                                        document.getElementById(`msg-${message.id}-div`)!.style.backgroundColor = '#2a2d2f';
+                                        document.getElementById(`msg-channel-msg-${message.id}-options`)!.style.display = 'block';
+                                    }}
+                                    onMouseOut={() => {
+                                        document.getElementById(`msg-${message.id}-div`)!.style.backgroundColor = 'inherit';
+                                        document.getElementById(`msg-channel-msg-${message.id}-options`)!.style.display = 'none';
+                                    }}
+                                >
+                                    {message.content ? (
+                                        <div>
+                                            {message.content.split('\n').map((line, index) => (
+                                                <>
+                                                    <p key={index} style={{ margin: '0px' }}>
+                                                        {line}
+                                                    </p>
+                                                    <br />
+                                                </>
+                                            ))}
+                                        </div>
+                                    ) : message.file?.startsWith('data:image/') ? (
+                                        <img src={message.file} alt='message file' referrerPolicy='no-referrer' style={{ maxHeight: '500px', maxWidth: '500px', marginTop: '10px', marginBottom: '10px' }} />
+                                    ) : message.file?.startsWith('data:audio/') ? (
+                                        <audio controls style={{ marginTop: '10px', marginBottom: '10px' }}>
+                                            <source src={message.file} type='audio/mpeg' />
+                                        </audio>
+                                    ) : message.file?.startsWith('data:video/') ? (
+                                        <video controls style={{ maxHeight: '350px', maxWidth: '500px', marginTop: '10px', marginBottom: '10px' }}>
+                                            <source src={message.file} type='video/mp4' />
+                                        </video>
+                                    ) : (
+                                        <div
+                                            style={{ backgroundColor: '#212426', display: 'flex', alignItems: 'center', cursor: 'pointer' }}
+                                            onClick={() => {
+                                                const a = document.createElement('a');
+
+                                                a.href = message.file!;
+                                                a.download = message.fileName!;
+
+                                                a.click();
+                                            }}
+                                        >
+                                            <p style={{ marginLeft: '10px' }}>{message.fileName}</p>
+                                            <img src='/assets/download-icon.png' style={{ marginLeft: '10px', marginRight: '10px' }} />
+                                        </div>
+                                    )}
+                                    <div id={`msg-channel-msg-${message.id}-options`} style={{ display: 'none' }}>
+                                        {message.authorID === cookies.get('id') && <img src='/assets/delete-icon.png' alt='delete icon' onClick={async () => await superagent.delete(`/api/channels/${channelID}/messages/${message.id}`)} />}
+                                    </div>
+                                </div>
                             ))}
                         </div>
                     );
                 })}
             </div>
             <div className='msg-channel-send-msg-div'>
-                <textarea value={newMessageContent} onChange={(e) => setNewMessageContent(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && sendMessage()} placeholder='Enter a Message' />
+                <img src='/assets/add-file-icon.png' onClick={handleSelectFile} />
+                {!newMessageFile.name ? (
+                    <textarea value={newMessageContent} onChange={(e) => setNewMessageContent(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && sendMessage()} placeholder='Enter a Message' contentEditable />
+                ) : (
+                    <>
+                        <p style={{ width: '100%' }}>You selected the file {newMessageFile.name}</p>
+                        <img src='/assets/delete-icon.png' onClick={() => setNewMessageFile({ name: '', data: '' })} />
+                    </>
+                )}
                 <button onClick={sendMessage}>Send</button>
             </div>
         </div>

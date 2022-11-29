@@ -5,12 +5,46 @@
     flex-direction: column;
     background-color: #313538;
 }
+.msg-channel-header,
+.msg-channel-header-right-side {
+    display: flex;
+    align-items: center;
+    flex-direction: row;
+}
+.msg-channel-header-right-side > input {
+    width: 125px !important;
+    height: 35px;
+}
 .msg-channel-msgs-div {
     overflow: auto;
+    height: 100%;
+}
+.msg-channel-msgs-div > div {
+    margin-left: 10px;
 }
 .msg-channel-msgs-div > div > div {
     display: flex;
+    align-items: center;
 }
 .msg-channel-send-msg-div {
     display: flex;
+    align-items: center;
+}
+.msg-channel-send-msg-div > img {
+    height: 40px;
+    margin-left: 10px;
+    margin-right: 10px;
+    cursor: pointer;
+}
+.msg-channel-msg-div {
+    display: flex;
+    justify-content: space-between;
+    margin-left: 50px;
+}
+.msg-channel-msg-div > p {
+    width: 100%;
+}
+.msg-channel-msg-div > div > img {
+    height: 30px;
+    cursor: pointer;
 }

@@ -28,8 +28,8 @@ app.use(function (_req, res, next) {
 
 app.use(cors({ origin: constants.frontendBaseURL }));
 
-app.use(bodyParser.json({ limit: '15mb' }));
-app.use(bodyParser.urlencoded({ extended: true, limit: '15mb' }));
+app.use(bodyParser.json({ limit: '125mb' }));
+app.use(bodyParser.urlencoded({ extended: true, limit: '125mb' }));
 
 const sessionParser = session({
     store: new (pgSession(session))({
