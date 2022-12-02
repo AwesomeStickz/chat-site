@@ -91,6 +91,40 @@ router.get('/channels', makeRateLimiter(60), handleAuthorizationCheck, async (re
     sendResponse(res, 200, channels);
 });
 
+router.post('/channels', makeRateLimiter(60), handleAuthorizationCheck, async (req, res) => {
+    const { type, users } = req.body;
+    if (!users || !type || type !== 'group') return sendResponse(res, 400);
+
+    const channelID = uid.getUniqueID().toString();
+
+    const channel = {
+        id: channelID,
+        users,
+        name: 'Group',
+        icon: '/assets/group-icon.png',
+        lastActiveAt: Date.now(),
+        type: 'group',
+    };
+
+    await db.query(
+        `
+            INSERT INTO channels (id, users, name, icon, last_active_at, type)
+            VALUES ($1, $2, $3, $4, $5, $6);
+        `,
+        Object.values(channel)
+    );
+
+    sendResponse(res, 200, { id: channelID });
+
+    // Send Message in WS
+    for (const userID of users) {
+        serverUtils.sendWSMessageToUser(userID, {
+            op: WebSocketOP.CHANNEL_CREATE,
+            d: channel,
+        });
+    }
+});
+
 router.get('/channels/:channelID', makeRateLimiter(60), handleAuthorizationCheck, async (req, res) => {
     const { channelID } = req.params;
 
@@ -144,6 +178,94 @@ router.get('/channels/:channelID', makeRateLimiter(60), handleAuthorizationCheck
     );
 });
 
+router.delete('/channels/:channelID/members/:memberID', makeRateLimiter(60), handleAuthorizationCheck, async (req, res) => {
+    const { channelID, memberID } = req.params;
+
+    const channel = (
+        await db.query(
+            `
+                SELECT *
+                FROM channels
+                WHERE id = $1;
+            `,
+            [channelID]
+        )
+    ).rows[0];
+
+    if (!channel || !channel.users.includes(memberID) || channel.type === 'dm') return sendResponse(res, 404);
+
+    if (channel.users.length === 1) {
+        await db.query(
+            `
+                DELETE FROM channels
+                WHERE id = $1;
+            `,
+            [channelID]
+        );
+
+        sendResponse(res, 200);
+
+        // Send Message in WS
+        for (const userID of channel.users) {
+            serverUtils.sendWSMessageToUser(userID, {
+                op: WebSocketOP.CHANNEL_MEMBER_REMOVE,
+                d: { id: channelID, memberID: req.session.user.id },
+            });
+        }
+    } else {
+        await db.query(
+            `
+                UPDATE channels
+                SET users = array_remove(users, $1)
+                WHERE id = $2;
+            `,
+            [memberID, channelID]
+        );
+
+        const username = (
+            await db.query(
+                `
+                    SELECT username
+                    FROM users
+                    WHERE id = $1;
+                `,
+                [memberID]
+            )
+        ).rows[0].username;
+
+        const message = {
+            id: uid.getUniqueID().toString(),
+            channelID,
+            authorID: '1',
+            content: `${username} left the group.`,
+            sentAt: Date.now(),
+            unreadUsers: channel.users.filter((userID: string) => userID !== memberID),
+        };
+
+        await db.query(
+            `
+                INSERT INTO messages (id, channel_id, author_id, content, sent_at, unread_users)
+                VALUES ($1, $2, $3, $4, $5, $6);
+            `,
+            Object.values(message)
+        );
+
+        sendResponse(res, 200);
+
+        // Send Message in WS
+        for (const userID of channel.users) {
+            serverUtils.sendWSMessageToUser(userID, {
+                op: WebSocketOP.CHANNEL_MEMBER_REMOVE,
+                d: { id: channelID, memberID },
+            });
+
+            serverUtils.sendWSMessageToUser(userID, {
+                op: WebSocketOP.MESSAGE_CREATE,
+                d: message,
+            });
+        }
+    }
+});
 router.get('/channels/:channelID/messages', makeRateLimiter(60), handleAuthorizationCheck, async (req, res) => {
     const { channelID } = req.params;
     const { content } = req.query;
@@ -526,6 +648,7 @@ router.patch('/friends/:username', makeRateLimiter(60), handleAuthorizationCheck
 
         if (!channel) {
             const channelID = uid.getUniqueID().toString();
+            const lastActiveAt = Date.now();
 
             await db.query(
                 `
@@ -534,7 +657,7 @@ router.patch('/friends/:username', makeRateLimiter(60), handleAuthorizationCheck
                     ON CONFLICT (id)
                     DO NOTHING;
                 `,
-                [channelID, [req.session.user.id, userID], null, null, Date.now(), 'dm']
+                [channelID, [req.session.user.id, userID], null, null, 'dm']
             );
 
             // Send Message in WS
@@ -546,6 +669,7 @@ router.patch('/friends/:username', makeRateLimiter(60), handleAuthorizationCheck
                         users: [req.session.user.id, userID],
                         name: id === userID ? username : req.session.user.username,
                         icon: id === userID ? userData.avatar : friendsInfo.avatar,
+                        lastActiveAt,
                         type: 'dm',
                     },
                 });

@@ -10,8 +10,9 @@ export enum WebSocketOP {
     FRIEND_REQ_REJECT = 9,
     FRIEND_REQ_DELETE = 10,
     CHANNEL_CREATE = 11,
-    ACK_MESSAGES = 12,
-    ACK_MESSAGES_RECEIVED = 13,
+    CHANNEL_MEMBER_REMOVE = 12,
+    ACK_MESSAGES = 13,
+    ACK_MESSAGES_RECEIVED = 14,
 }
 
 export interface WebSocketEvent {
