@@ -5,6 +5,10 @@
     flex-direction: column;
     background-color: #313538;
 }
+.msg-channel-header {
+    background-color: #26282a;
+    padding: 10px 0;
+}
 .msg-channel-header,
 .msg-channel-header-right-side {
     display: flex;

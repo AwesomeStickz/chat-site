@@ -13,6 +13,12 @@ export enum WebSocketOP {
     CHANNEL_MEMBER_REMOVE = 12,
     ACK_MESSAGES = 13,
     ACK_MESSAGES_RECEIVED = 14,
+    CALL_CREATE = 15,
+    CALL_ACK = 16,
+    CALL_ACCEPT = 17,
+    CALL_REJECT = 18,
+    CALL_DATA = 19,
+    CALL_END = 20,
 }
 
 export interface WebSocketEvent {

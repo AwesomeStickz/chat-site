@@ -1,43 +1,34 @@
 import cookies from 'js-cookie';
-import { constants } from './constants';
+import { io } from 'socket.io-client';
 import { WebSocketEvent, WebSocketOP } from './websocketEvents';
 
-let ws: WebSocket;
+export let socket: ReturnType<typeof io> | null = null;
 
 export const wsMessageListeners = new Map<string, Function>();
 
 export const websiteUtils = {
     connectToWS: (setIsLoaded: Function, setUnreadData: Function) => {
-        if (!ws || !ws.OPEN) ws = new WebSocket(constants.websocketURL);
+        socket = io();
 
-        ws.onopen = () => {
-            ws.send(JSON.stringify({ op: WebSocketOP.HELLO, d: { id: cookies.get('id'), sessionID: cookies.get('connect.sid') } }));
+        socket.on('connect', () => {
+            socket?.send({ op: WebSocketOP.HELLO, d: { id: cookies.get('id'), sessionID: cookies.get('connect.sid') } });
 
             setIsLoaded(true);
 
             setInterval(() => {
-                ws.send(JSON.stringify({ op: WebSocketOP.PING, d: null }));
+                socket?.send({ op: WebSocketOP.PING, d: null });
             }, 30000);
-        };
+        });
 
-        ws.onclose = () => {
-            setIsLoaded(false);
-
-            setTimeout(() => window.location.reload(), 3000);
-        };
-
-        ws.onmessage = (msg) => {
-            const message = JSON.parse(msg.data) as WebSocketEvent;
-
+        socket.on('message', (message: WebSocketEvent) => {
             if (message.op === WebSocketOP.HELLO) setUnreadData(message.d);
 
             for (const wsMessageListener of wsMessageListeners) wsMessageListener[1](message);
-        };
+        });
     },
     heartbeat: () => {
-        ws.send(JSON.stringify({ op: WebSocketOP.PING }));
+        socket?.send({ op: WebSocketOP.PING });
     },
-    // PascalCase cuz React errors otherwise for using useLayoutEffect
     attachMessageListenerToWS: (func: Function) => {
         const id = websiteUtils.generateRandomChars(64);
 
@@ -46,7 +37,7 @@ export const websiteUtils = {
         return id;
     },
     sendMessageToWS: (message: WebSocketEvent) => {
-        ws.send(JSON.stringify(message));
+        socket?.send(message);
     },
     generateRandomChars: (length: number) => {
         let result = '';

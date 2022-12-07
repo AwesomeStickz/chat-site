@@ -611,7 +611,7 @@ router.patch('/friends/:username', makeRateLimiter(60), handleAuthorizationCheck
                 )
             ).rows[0] || {};
 
-        if (friendsInfo.friends.includes(userID)) return sendResponse(res, 403);
+        if (friendsInfo.friends?.includes(userID)) return sendResponse(res, 403);
 
         await db.query(
             `
@@ -657,7 +657,7 @@ router.patch('/friends/:username', makeRateLimiter(60), handleAuthorizationCheck
                     ON CONFLICT (id)
                     DO NOTHING;
                 `,
-                [channelID, [req.session.user.id, userID], null, null, 'dm']
+                [channelID, [req.session.user.id, userID], null, null, Date.now(), 'dm']
             );
 
             // Send Message in WS

@@ -138,7 +138,7 @@ const AppLeftSideBar = (props: any) => {
                         </p>
                     </div>
                 </div>
-                <div>
+                <div style={{ paddingLeft: '20px' }}>
                     {channels
                         .sort((a, b) => b.lastActiveAt - a.lastActiveAt)
                         .map((channel, index) => {
