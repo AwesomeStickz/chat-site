@@ -7,6 +7,7 @@ import express from 'express';
 import session from 'express-session';
 import http from 'http';
 import { Snowflake } from 'nodejs-snowflake';
+import path from 'path';
 import { Server } from 'socket.io';
 import { constants } from '../src/utils/constants';
 import { WebSocketEvent, WebSocketOP } from '../src/utils/websocketEvents';
@@ -54,17 +55,38 @@ app.use(cookieParser());
 app.use('/api', routers.API);
 app.use('/oauth', routers.OAuth);
 
-// app.use(express.static(path.join(__dirname, '../../', 'build')));
+app.use(express.static(path.join(__dirname, '../../', 'build')));
 
-// app.get('/*', (_req, res) => {
-//     res.sendFile(path.join(__dirname, '../../', 'build', 'index.html'));
-// });
+app.get('/*', (_req, res) => {
+    res.sendFile(path.join(__dirname, '../../', 'build', 'index.html'));
+});
 
 server.listen(constants.backendPort);
 
 export const wsConnections = new Map<string, { id: string; sessionID: string; socket: any; lastPing: number }[]>();
 
 const io = new Server(server);
+const callPings = {} as Record<string, Record<string, number>>;
+
+setInterval(() => {
+    for (const channelID in callPings) {
+        for (const userID in callPings[channelID]) {
+            if (callPings[channelID][userID] < Date.now() - 5000) {
+                for (const usersInThisChannel in callPings[channelID]) {
+                    const connsForThisUser = wsConnections.get(usersInThisChannel) || [];
+
+                    for (const con of connsForThisUser) {
+                        con.socket.send({ op: WebSocketOP.CALL_END, d: { channelID } });
+                    }
+
+                    delete callPings[channelID][userID];
+                }
+
+                break;
+            }
+        }
+    }
+}, 1000);
 
 io.on('connection', (socket) => {
     const ids = {
@@ -266,14 +288,21 @@ io.on('connection', (socket) => {
                 break;
             }
             case WebSocketOP.CALL_DATA: {
-                const id = message.d.id;
-                const room = message.d.channelID;
+                if (message.d.type === 'ping') {
+                    const { channelID } = message.d;
 
-                socket.join(room);
-                socket.to(room).emit('message', { op: WebSocketOP.CALL_DATA, d: { type: 'userJoined', id } });
-                socket.on('disconnect', () => {
-                    socket.to(room).emit('message', { op: WebSocketOP.CALL_DATA, d: { type: 'userDisconnect', id } });
-                });
+                    callPings[channelID] = callPings[channelID] || {};
+                    callPings[channelID][ids.user] = Date.now();
+                } else {
+                    const id = message.d.id;
+                    const room = message.d.channelID;
+
+                    socket.join(room);
+                    socket.to(room).emit('message', { op: WebSocketOP.CALL_DATA, d: { type: 'userJoined', id } });
+                    socket.on('disconnect', () => {
+                        socket.to(room).emit('message', { op: WebSocketOP.CALL_DATA, d: { type: 'userDisconnect', id } });
+                    });
+                }
 
                 break;
             }

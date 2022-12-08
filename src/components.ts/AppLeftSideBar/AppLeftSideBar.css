@@ -50,6 +50,7 @@
     background: #00000090;
     top: 0;
     left: 0;
+    z-index: 9999;
 }
 .group-create-div > div {
     width: 400px;

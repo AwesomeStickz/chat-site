@@ -1,3 +1,10 @@
+.call-div {
+    width: 100%;
+}
+.call-div-buttons {
+    display: flex;
+    justify-content: center;
+}
 #videoDiv {
     display: flex;
     justify-content: center;
