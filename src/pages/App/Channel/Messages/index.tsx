@@ -1,4 +1,5 @@
 import cookies from 'js-cookie';
+import parseDuration from 'parse-duration';
 import { useEffect, useLayoutEffect, useState } from 'react';
 import { withRouter } from 'react-router-dom';
 import superagent from 'superagent';
@@ -17,8 +18,11 @@ const Channel = (props: any) => {
 
     const [newMessageContent, setNewMessageContent] = useState('');
     const [newMessageFile, setNewMessageFile] = useState({ name: '', data: '' });
+    const [messageSettings, setMessageSettings] = useState({ isOneTimeMessage: false, maxAliveTime: 0 });
+    const [maxAliveTimeText, setMaxAliveTimeText] = useState('');
 
     const [displayGroupMembers, setDisplayGroupMembers] = useState(false);
+    const [displayMessageSettings, setDisplayMessageSettings] = useState(false);
 
     const [wsMessageListenerID, setWSMessageListenerID] = useState('');
 
@@ -29,6 +33,8 @@ const Channel = (props: any) => {
             content: newMessageContent,
             file: newMessageFile.name.length === 0 ? null : newMessageFile.data,
             fileName: newMessageFile.name.length === 0 ? null : newMessageFile.name,
+            isOneTimeMessage: messageSettings.isOneTimeMessage,
+            maxAliveTime: messageSettings.maxAliveTime ? messageSettings.maxAliveTime : null,
         });
 
         setNewMessageContent('');
@@ -69,7 +75,7 @@ const Channel = (props: any) => {
             setChannel(channelData);
             setMessages(messagesData.sort((a: Message, b: Message) => Number(a.sentAt) - Number(b.sentAt)));
 
-            websiteUtils.sendMessageToWS({ op: WebSocketOP.ACK_MESSAGES, d: { channelID: channelID } });
+            setTimeout(() => websiteUtils.sendMessageToWS({ op: WebSocketOP.ACK_MESSAGES, d: { channelID: channelID } }), 2500);
 
             const id = websiteUtils.attachMessageListenerToWS((message: WebSocketEvent) => {
                 if (message.op === WebSocketOP.MESSAGE_CREATE) {
@@ -157,14 +163,23 @@ const Channel = (props: any) => {
                                     >
                                         {message.content ? (
                                             <div>
-                                                {message.content.split('\n').map((line, index) => (
-                                                    <>
-                                                        <p key={index} style={{ margin: '0px' }}>
-                                                            {line}
-                                                        </p>
-                                                        <br />
-                                                    </>
-                                                ))}
+                                                {message.system
+                                                    ? message.content.split('\n').map((line, index) => (
+                                                          <>
+                                                              <p key={index} style={{ margin: '0px', color: '#9b9b9b', fontStyle: 'italic' }}>
+                                                                  {line}
+                                                              </p>
+                                                              <br />
+                                                          </>
+                                                      ))
+                                                    : message.content.split('\n').map((line, index) => (
+                                                          <>
+                                                              <p key={index} style={{ margin: '0px' }}>
+                                                                  {line}
+                                                              </p>
+                                                              <br />
+                                                          </>
+                                                      ))}
                                             </div>
                                         ) : message.file?.startsWith('data:image/') ? (
                                             <img src={message.file} alt='message file' referrerPolicy='no-referrer' style={{ maxHeight: '500px', maxWidth: '500px', marginTop: '10px', marginBottom: '10px' }} />
@@ -212,6 +227,7 @@ const Channel = (props: any) => {
                         </>
                     )}
                     <button onClick={sendMessage}>Send</button>
+                    <img src='/assets/gear-icon.png' onClick={() => setDisplayMessageSettings(true)} />
                 </div>
             </div>
             {displayGroupMembers && (
@@ -231,6 +247,51 @@ const Channel = (props: any) => {
                             ))}
                         </div>
                         <button className='group-create-cancel-btn' onClick={() => setDisplayGroupMembers(false)}>
+                            Close
+                        </button>
+                    </div>
+                </div>
+            )}
+            {displayMessageSettings && (
+                <div className='group-create-div'>
+                    <div>
+                        <h1>Message Settings</h1>
+                        <div className='group-create-friends' style={{ maxHeight: '300px', marginBottom: '15px' }}>
+                            <>
+                                <div
+                                    onClick={() => {
+                                        document.getElementById(`one-time-messsage`)!.click();
+
+                                        console.log(messageSettings.isOneTimeMessage);
+
+                                        setMessageSettings({ ...messageSettings, isOneTimeMessage: !messageSettings.isOneTimeMessage });
+                                    }}
+                                >
+                                    <div className='friend-details'>
+                                        <p>Viewable Only Once</p>
+                                    </div>
+                                    <input id={`one-time-messsage`} type='checkbox' checked={messageSettings.isOneTimeMessage} />
+                                </div>
+                                <div>
+                                    <div className='friend-details'>
+                                        <p>Delete After</p>
+                                    </div>
+                                    <input
+                                        id={`one-time-messsage`}
+                                        type='text'
+                                        value={maxAliveTimeText}
+                                        onChange={(e) => {
+                                            const timeInMs = parseDuration(e.target.value);
+
+                                            setMessageSettings({ ...messageSettings, maxAliveTime: timeInMs });
+
+                                            setMaxAliveTimeText(e.target.value);
+                                        }}
+                                    />
+                                </div>
+                            </>
+                        </div>
+                        <button className='group-create-cancel-btn' onClick={() => setDisplayMessageSettings(false)}>
                             Close
                         </button>
                     </div>

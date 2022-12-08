@@ -168,14 +168,16 @@ router.get('/channels/:channelID', makeRateLimiter(60), handleAuthorizationCheck
     sendResponse(res, 200, channel);
 
     // Ack Messages
-    await db.query(
-        `
-            UPDATE messages
-            SET unread_users = array_remove(unread_users, $1)
-            WHERE channel_id = $2;
-        `,
-        [req.session.user.id, channelID]
-    );
+    setTimeout(async () => {
+        await db.query(
+            `
+                UPDATE messages
+                SET unread_users = array_remove(unread_users, $1)
+                WHERE channel_id = $2;
+            `,
+            [req.session.user.id, channelID]
+        );
+    }, 5000);
 });
 
 router.delete('/channels/:channelID/members/:memberID', makeRateLimiter(60), handleAuthorizationCheck, async (req, res) => {
@@ -240,6 +242,7 @@ router.delete('/channels/:channelID/members/:memberID', makeRateLimiter(60), han
             content: `${username} left the group.`,
             sentAt: Date.now(),
             unreadUsers: channel.users.filter((userID: string) => userID !== memberID),
+            system: true,
         };
 
         await db.query(
@@ -266,6 +269,7 @@ router.delete('/channels/:channelID/members/:memberID', makeRateLimiter(60), han
         }
     }
 });
+
 router.get('/channels/:channelID/messages', makeRateLimiter(60), handleAuthorizationCheck, async (req, res) => {
     const { channelID } = req.params;
     const { content } = req.query;
@@ -281,7 +285,10 @@ router.get('/channels/:channelID/messages', makeRateLimiter(60), handleAuthoriza
                     file,
                     file_name AS "fileName",
                     sent_at AS "sentAt",
-                    edited_at AS "editedAt"
+                    edited_at AS "editedAt",
+                    is_one_time_message AS "isOneTimeMessage",
+                    max_alive_time AS "maxAliveTime",
+                    unread_users AS "unreadUsers"
                 FROM messages
                 WHERE channel_id = $1${content ? ' AND content LIKE $2' : ''}
                 ORDER BY sent_at DESC;
@@ -290,12 +297,36 @@ router.get('/channels/:channelID/messages', makeRateLimiter(60), handleAuthoriza
         )
     ).rows;
 
-    sendResponse(res, 200, messages);
+    sendResponse(
+        res,
+        200,
+        messages.map((message) => {
+            if (message.isOneTimeMessage && !message.unreadUsers.includes(req.session.user.id)) {
+                message.content = "This is an one time message and you've already read it so it's no longer viewable.";
+
+                message.file = null;
+                message.fileName = null;
+
+                message.system = true;
+            }
+
+            if (message.maxAliveTime && Date.now() - message.sentAt > message.maxAliveTime) {
+                message.content = 'This message has expired.';
+
+                message.file = null;
+                message.fileName = null;
+
+                message.system = true;
+            }
+
+            return message;
+        })
+    );
 });
 
 router.post('/channels/:channelID/messages', makeRateLimiter(60), handleAuthorizationCheck, async (req, res) => {
     const { channelID } = req.params;
-    const { content, file, fileName } = req.body;
+    const { content, file, fileName, isOneTimeMessage, maxAliveTime } = req.body;
 
     if (!content && !file) return sendResponse(res, 400);
     if (file) {
@@ -327,12 +358,14 @@ router.post('/channels/:channelID/messages', makeRateLimiter(60), handleAuthoriz
         file,
         fileName,
         sentAt: Date.now(),
+        isOneTimeMessage,
+        maxAliveTime,
     };
 
     await db.query(
         `
-            INSERT INTO messages (id, channel_id, author_id, content, file, file_name, sent_at, unread_users)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8);
+            INSERT INTO messages (id, channel_id, author_id, content, file, file_name, sent_at, is_one_time_message, max_alive_time, unread_users)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10);
         `,
         [...Object.values(message), usersInThisChannel.filter((userID) => userID !== req.session.user.id)]
     );

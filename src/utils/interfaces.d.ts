@@ -16,6 +16,9 @@ export interface Message {
     fileName?: string;
     sentAt: string;
     editedAt?: string;
+    isOneTimeMessage?: boolean;
+    maxAliveTime?: number;
+    system?: boolean;
 }
 
 export interface User {
