@@ -61,7 +61,9 @@ const Friends = () => {
         <div className='friends-bar-main'>
             <div className='friends-bar-header'>
                 <div onClick={() => setSelectedMenu('friends')}>All Friends</div>
-                <div onClick={() => setSelectedMenu('pending')}>Pending Requests {friendRequests.length > 0 && friendRequests.length}</div>
+                <div style={{ display: 'flex', alignItems: 'center' }} onClick={() => setSelectedMenu('pending')}>
+                    Pending Requests {friendRequests.length > 0 && <div className='unread-div'>{friendRequests.length}</div>}
+                </div>
                 <div onClick={() => setSelectedMenu('addFriends')}>Add Friend</div>
             </div>
             <hr />
@@ -69,7 +71,7 @@ const Friends = () => {
                 <div>
                     {friends?.map((friend) => {
                         return (
-                            <div style={{ display: 'flex' }}>
+                            <div style={{ display: 'flex', marginLeft: '15px', marginTop: '12px' }}>
                                 <div className='friend-details'>
                                     <img src={friend.avatar} alt='profile pic' referrerPolicy='no-referrer' />
                                     <p>{friend.username}</p>
@@ -87,8 +89,8 @@ const Friends = () => {
                     })}
                 </div>
             ) : selectedMenu === 'pending' ? (
-                <div>
-                    <p>Incoming</p>
+                <div style={{ paddingLeft: '15px' }}>
+                    <h3>Incoming Requests</h3>
                     {friendRequests?.map((friendRequest) => {
                         return (
                             <div className='pending-friend-req'>
@@ -107,7 +109,7 @@ const Friends = () => {
                             </div>
                         );
                     })}
-                    <p>Outgoing</p>
+                    <h3>Outgoing Requests</h3>
                     {pendingFriendRequests?.map((pendingFriendRequest) => {
                         return (
                             <div className='pending-friend-req'>

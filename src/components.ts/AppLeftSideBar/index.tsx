@@ -96,7 +96,7 @@ const AppLeftSideBar = (props: any) => {
                         return unreadData;
                     });
                 } else if (message.op === WebSocketOP.CHANNEL_MEMBER_REMOVE) {
-                    if (message.d.removedMemberID === currentUserID) setChannels((channels) => channels.filter((channel) => channel.id !== message.d.channelID));
+                    if (message.d.memberID === currentUserID) setChannels((channels) => channels.filter((channel: any) => channel.id !== message.d.id));
                 }
             });
 
@@ -138,12 +138,12 @@ const AppLeftSideBar = (props: any) => {
                         </p>
                     </div>
                 </div>
-                <div style={{ paddingLeft: '20px' }}>
+                <div style={{ paddingLeft: '20px', cursor: 'pointer' }}>
                     {channels
                         .sort((a, b) => b.lastActiveAt - a.lastActiveAt)
-                        .map((channel, index) => {
+                        .map((channel) => {
                             return (
-                                <div className='friend-details' onClick={() => history.push(`/app/channels/${channel.id}`)} key={index}>
+                                <div className='friend-details' onClick={() => history.push(`/app/channels/${channel.id}`)} style={{ marginBottom: '10px' }}>
                                     <img src={channel.icon} alt='profile pic' referrerPolicy='no-referrer' />
                                     <p>{channel.name}</p>
                                     {unreadMessagesInEachChannelCount[channel.id] > 0 && <div className='unread-div'>{getUnreadNumber(unreadMessagesInEachChannelCount[channel.id])}</div>}

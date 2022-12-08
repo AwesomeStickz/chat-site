@@ -7,18 +7,11 @@ import './Call.css';
 let myVideoStream: MediaStream;
 let otherUserVideoStream: MediaStream;
 
-// @ts-expect-error
-const peer: any = new Peer();
-// TODO: Fix this
-// const peer: any = new Peer(constants.peerJSConfig);
-
 const handleVideoAdd = (video: HTMLVideoElement, stream: MediaStream) => {
     video.srcObject = stream;
 
     video.addEventListener('loadedmetadata', () => video.play());
 };
-
-const peerConnections: any = {};
 
 const toggleAudio = (stream: MediaStream) => stream.getAudioTracks().forEach((track) => (track.enabled = !track.enabled));
 const toggleVideo = (stream: MediaStream) => stream.getVideoTracks().forEach((track) => (track.enabled = !track.enabled));
@@ -43,7 +36,17 @@ const Call = (props: any) => {
     const [focusCurrentUser, setFocusCurrentUser] = useState(false);
     const [pingIntervalID, setPingIntervalID] = useState(0);
 
+    const [mutedData, setMutedData] = useState({ me: false, other: false });
+    const [camOnData, setCamOnData] = useState({ me: true, other: true });
+
     useEffect(() => {
+        // @ts-expect-error
+        const peer: any = new Peer();
+        // TODO: Fix this
+        // const peer: any = new Peer(constants.peerJSConfig);
+
+        const peerConnections: any = {};
+
         navigator.mediaDevices
             .getUserMedia({
                 video: true,
@@ -58,7 +61,7 @@ const Call = (props: any) => {
 
                 const currentURL = window.location.href;
 
-                // ping websocket every 1 second
+                // Ping Websocket Every Second
                 const id = setInterval(() => {
                     websiteUtils.sendMessageToWS({ op: WebSocketOP.CALL_DATA, d: { type: 'ping', channelID } });
 
@@ -143,9 +146,33 @@ const Call = (props: any) => {
                 <video id='otherUserVid' autoPlay onClick={() => setFocusCurrentUser(!focusCurrentUser)} style={focusCurrentUser ? otherUserFocusStyle : currentUserFocusStyle} />
             </div>
             <div className='call-div-buttons'>
-                <button onClick={() => toggleAudio(myVideoStream)}>Toggle Audio</button>
-                <button onClick={() => toggleVideo(myVideoStream)}>Toggle Video</button>
-                <button onClick={() => toggleAudio(otherUserVideoStream)}>Toggle Other User Audio</button>
+                <button
+                    onClick={() => {
+                        toggleAudio(myVideoStream);
+
+                        setMutedData({ ...mutedData, me: !mutedData.me });
+                    }}
+                >
+                    {mutedData.me ? 'Unmute' : 'Mute'}
+                </button>
+                <button
+                    onClick={() => {
+                        toggleVideo(myVideoStream);
+
+                        setCamOnData({ ...camOnData, me: !camOnData.me });
+                    }}
+                >
+                    {camOnData.me ? 'Turn Camera Off' : 'Turn Camera On'}
+                </button>
+                <button
+                    onClick={() => {
+                        toggleAudio(otherUserVideoStream);
+
+                        setMutedData({ ...mutedData, other: !mutedData.other });
+                    }}
+                >
+                    {mutedData.other ? 'Enable Speaker' : 'Disable Speaker'}
+                </button>
                 <button
                     onClick={() => {
                         const video = document.getElementById('myVid') as HTMLVideoElement;
@@ -159,7 +186,9 @@ const Call = (props: any) => {
                 >
                     Hide My Video
                 </button>
-                <button onClick={() => websiteUtils.sendMessageToWS({ op: WebSocketOP.CALL_END, d: { channelID } })}>End Call</button>
+                <button className='group-create-cancel-btn' onClick={() => websiteUtils.sendMessageToWS({ op: WebSocketOP.CALL_END, d: { channelID } })}>
+                    End Call
+                </button>
             </div>
         </div>
     );

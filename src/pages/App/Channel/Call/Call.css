@@ -4,6 +4,7 @@
 .call-div-buttons {
     display: flex;
     justify-content: center;
+    margin-top: 20px;
 }
 #videoDiv {
     display: flex;

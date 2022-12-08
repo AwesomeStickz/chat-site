@@ -1,7 +1,7 @@
 import cookies from 'js-cookie';
 import parseDuration from 'parse-duration';
 import { useEffect, useLayoutEffect, useState } from 'react';
-import { withRouter } from 'react-router-dom';
+import { useHistory, withRouter } from 'react-router-dom';
 import superagent from 'superagent';
 import Loader from '../../../../components.ts/Loader';
 import { Channel as ChannelInterface, Message } from '../../../../utils/interfaces';
@@ -11,6 +11,8 @@ import './Channel.css';
 
 const Channel = (props: any) => {
     const { channelID } = props.match.params;
+
+    const history = useHistory();
 
     const [isLoading, setIsLoading] = useState(true);
     const [channel, setChannel] = useState({} as ChannelInterface);
@@ -84,9 +86,8 @@ const Channel = (props: any) => {
                     if (window.location.href.endsWith(channelID)) websiteUtils.sendMessageToWS({ op: WebSocketOP.ACK_MESSAGES, d: { channelID } });
                 } else if (message.op === WebSocketOP.MESSAGE_DELETE) setMessages((messages) => messages.filter((m) => m.id !== message.d.id));
                 else if (message.op === WebSocketOP.MESSAGE_UPDATE) setMessages((messages) => messages.map((m) => (m.id === message.d.id ? message.d : m)));
-                else if (message.op === WebSocketOP.CHANNEL_CREATE) setChannel(message.d);
                 else if (message.op === WebSocketOP.CHANNEL_MEMBER_REMOVE) {
-                    if (message.d.id === cookies.get('id')) props.history.push('/app');
+                    if (message.d.id === cookies.get('id')) history.push('/app');
                     else setChannel((channel) => ({ ...channel, users: channel.users.filter((user) => user.id !== message.d.memberID) }));
                 }
             });
@@ -127,7 +128,14 @@ const Channel = (props: any) => {
                             <>
                                 <p style={{ cursor: 'pointer', scale: '2' }}>+</p>
                                 <img src='/assets/friends-icon.png' style={{ cursor: 'pointer', height: '40px', marginLeft: '20px' }} onClick={() => setDisplayGroupMembers(true)} />
-                                <img src='/assets/exit-icon.png' style={{ cursor: 'pointer', height: '40px', marginLeft: '10px', marginRight: '10px' }} onClick={async () => await superagent.delete(`/api/channels/${channelID}/members/${cookies.get('id')}`)} />
+                                <img
+                                    src='/assets/exit-icon.png'
+                                    style={{ cursor: 'pointer', height: '40px', marginLeft: '10px', marginRight: '10px' }}
+                                    onClick={async () => {
+                                        await superagent.delete(`/api/channels/${channelID}/members/${cookies.get('id')}`);
+                                        history.push('/app');
+                                    }}
+                                />
                             </>
                         )}
                     </div>

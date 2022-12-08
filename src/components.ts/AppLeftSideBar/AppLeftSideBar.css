@@ -39,6 +39,7 @@
     align-items: center;
     justify-content: center;
     display: flex;
+    margin-left: 7.5px;
 }
 .group-create-div {
     display: flex;
