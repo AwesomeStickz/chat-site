@@ -78,10 +78,27 @@ const Channel = (props: any) => {
             setMessages(messagesData.sort((a: Message, b: Message) => Number(a.sentAt) - Number(b.sentAt)));
 
             setTimeout(() => websiteUtils.sendMessageToWS({ op: WebSocketOP.ACK_MESSAGES, d: { channelID: channelID } }), 2500);
+            setTimeout(() => {
+                const messagesDiv = document.getElementsByClassName('msg-channel-msgs-div')[0];
+
+                messagesDiv.scrollTo({
+                    top: messagesDiv.scrollHeight,
+                    behavior: 'smooth',
+                });
+            }, 100);
 
             const id = websiteUtils.attachMessageListenerToWS((message: WebSocketEvent) => {
                 if (message.op === WebSocketOP.MESSAGE_CREATE) {
                     setMessages((messages) => [...messages, message.d]);
+
+                    setTimeout(() => {
+                        const messagesDiv = document.getElementsByClassName('msg-channel-msgs-div')[0];
+
+                        messagesDiv.scrollTo({
+                            top: messagesDiv.scrollHeight,
+                            behavior: 'smooth',
+                        });
+                    }, 100);
 
                     if (window.location.href.endsWith(channelID)) websiteUtils.sendMessageToWS({ op: WebSocketOP.ACK_MESSAGES, d: { channelID } });
                 } else if (message.op === WebSocketOP.MESSAGE_DELETE) setMessages((messages) => messages.filter((m) => m.id !== message.d.id));
@@ -94,7 +111,6 @@ const Channel = (props: any) => {
 
             setWSMessageListenerID(id);
 
-            // TODO: Fix this
             setIsLoading(false);
 
             messages.every(() => null);
@@ -171,7 +187,7 @@ const Channel = (props: any) => {
                                     >
                                         {message.content ? (
                                             <div>
-                                                {message.system
+                                                {message.system || message.authorID === '1'
                                                     ? message.content.split('\n').map((line, index) => (
                                                           <>
                                                               <p key={index} style={{ margin: '0px', color: '#9b9b9b', fontStyle: 'italic' }}>
@@ -227,7 +243,13 @@ const Channel = (props: any) => {
                 <div className='msg-channel-send-msg-div'>
                     <img src='/assets/add-file-icon.png' onClick={handleSelectFile} />
                     {!newMessageFile.name ? (
-                        <textarea value={newMessageContent} onChange={(e) => setNewMessageContent(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && sendMessage()} placeholder='Enter a Message' />
+                        <textarea
+                            style={{ height: `${newMessageContent.split('\n').length * 25 + 25 >= 150 ? 150 : newMessageContent.split('\n').length * 25 + 25}px`, lineHeight: `${newMessageContent.split('\n').length < 2 ? '50px' : 'initial'}` }}
+                            value={newMessageContent}
+                            onChange={(e) => setNewMessageContent(e.target.value)}
+                            onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && sendMessage()}
+                            placeholder='Enter a Message'
+                        />
                     ) : (
                         <>
                             <p style={{ width: '100%' }}>You selected the file {newMessageFile.name}</p>

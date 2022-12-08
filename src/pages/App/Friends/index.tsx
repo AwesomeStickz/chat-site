@@ -129,7 +129,17 @@ const Friends = () => {
             ) : selectedMenu === 'addFriends' ? (
                 <div className='friends-bar-add-friends'>
                     <input type='text' value={usernameToSendFriendRequest} onChange={(e) => setUsernameToSendFriendRequest(e.target.value)} placeholder='Enter a Username' />
-                    <button onClick={async () => await superagent.patch(`/api/friends/${usernameToSendFriendRequest}`).send({ op: 'add' })}>Send Request</button>
+                    <button
+                        onClick={async () => {
+                            await superagent.patch(`/api/friends/${usernameToSendFriendRequest}`).send({ op: 'add' });
+
+                            setUsernameToSendFriendRequest('');
+
+                            setSelectedMenu('pending');
+                        }}
+                    >
+                        Send Request
+                    </button>
                 </div>
             ) : null}
         </div>

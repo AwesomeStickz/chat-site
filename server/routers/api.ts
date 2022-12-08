@@ -242,7 +242,6 @@ router.delete('/channels/:channelID/members/:memberID', makeRateLimiter(60), han
             content: `${username} left the group.`,
             sentAt: Date.now(),
             unreadUsers: channel.users.filter((userID: string) => userID !== memberID),
-            system: true,
         };
 
         await db.query(
@@ -252,6 +251,9 @@ router.delete('/channels/:channelID/members/:memberID', makeRateLimiter(60), han
             `,
             Object.values(message)
         );
+
+        // @ts-expect-error
+        message.system = true;
 
         sendResponse(res, 200);
 
@@ -526,7 +528,8 @@ router.patch('/friends/:username', makeRateLimiter(60), handleAuthorizationCheck
                 `
                 SELECT
                     id,
-                    avatar
+                    avatar,
+                    username
                 FROM users
                 WHERE username = $1;
             `,
