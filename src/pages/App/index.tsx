@@ -16,7 +16,7 @@ const App = () => {
     const [isLoaded, setIsLoaded] = useState(false);
     const [unreadData, setUnreadData] = useState({ pendingFriendRequests: 0, unreadMessages: {} });
     const [displayCallDivType, setDisplayCallDivType] = useState('');
-    const [callData, setCallData] = useState({ channelID: '', username: '' });
+    const [callData, setCallData] = useState({ channelID: '', username: '', type: '' });
 
     useEffect(() => {
         if (!cookies.get('username') || !cookies.get('loggedIn')) return window.location.replace('/login');
@@ -32,12 +32,12 @@ const App = () => {
                 setCallData(message.d);
             } else if (message.op === WebSocketOP.CALL_END || message.op === WebSocketOP.CALL_REJECT) {
                 setDisplayCallDivType('');
-                setCallData({ channelID: '', username: '' });
+                setCallData({ channelID: '', username: '', type: '' });
             } else if (message.op === WebSocketOP.CALL_ACCEPT) {
                 setDisplayCallDivType('');
-                setCallData({ channelID: '', username: '' });
+                setCallData({ channelID: '', username: '', type: '' });
 
-                setTimeout(() => history.push(`/app/channels/${message.d.channelID}/call`), 2500);
+                setTimeout(() => history.push(`/app/channels/${message.d.channelID}/call?type=${message.d.type}`), 2500);
             }
         });
     }, []);
@@ -70,19 +70,19 @@ const App = () => {
                                     websiteUtils.sendMessageToWS({ op: WebSocketOP.CALL_REJECT, d: { channelID: callData.channelID } });
 
                                     setDisplayCallDivType('');
-                                    setCallData({ channelID: '', username: '' });
+                                    setCallData({ channelID: '', username: '', type: '' });
                                 }}
                             >
                                 Reject
                             </button>
                             <button
                                 onClick={async () => {
-                                    websiteUtils.sendMessageToWS({ op: WebSocketOP.CALL_ACCEPT, d: { channelID: callData.channelID } });
+                                    websiteUtils.sendMessageToWS({ op: WebSocketOP.CALL_ACCEPT, d: { channelID: callData.channelID, type: callData.type } });
 
                                     setDisplayCallDivType('');
-                                    setCallData({ channelID: '', username: '' });
+                                    setCallData({ channelID: '', username: '', type: '' });
 
-                                    history.push(`/app/channels/${callData.channelID}/call`);
+                                    history.push(`/app/channels/${callData.channelID}/call?type=${callData.type}`);
                                 }}
                             >
                                 Accept

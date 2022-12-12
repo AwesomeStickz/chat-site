@@ -7,7 +7,7 @@ import Loader from '../../../../components.ts/Loader';
 import { Channel as ChannelInterface, Message } from '../../../../utils/interfaces';
 import { websiteUtils, wsMessageListeners } from '../../../../utils/websiteUtils';
 import { WebSocketEvent, WebSocketOP } from '../../../../utils/websocketEvents';
-import './Channel.css';
+import './Messages.css';
 
 const Channel = (props: any) => {
     const { channelID } = props.match.params;
@@ -56,8 +56,7 @@ const Channel = (props: any) => {
                 reader.onload = () => {
                     if (typeof reader.result !== 'string') return;
 
-                    // TODO: Erorr message
-                    // if (fileSelectorElement.files![0].size / 1024 / 1024 > 100) return setPopupMessage('Please select a file whose size is less than or equal to 10MB!');
+                    if (fileSelectorElement.files![0].size / 1024 / 1024 > 100) return;
 
                     setNewMessageFile({ name: fileSelectorElement.files![0].name, data: reader.result });
                 };
@@ -136,13 +135,11 @@ const Channel = (props: any) => {
                     <div className='msg-channel-header-right-side'>
                         {channel.type === 'dm' ? (
                             <>
-                                <img src='/assets/voice-call-icon.png' alt='voice call' style={{ width: '35px', cursor: 'pointer' }} />
-                                <img src='/assets/video-call-icon.png' alt='video call' style={{ width: '30px', marginLeft: '10px', cursor: 'pointer' }} onClick={() => websiteUtils.sendMessageToWS({ op: WebSocketOP.CALL_CREATE, d: { channelID } })} />
-                                <input type='text' placeholder='Search' style={{ marginLeft: '10px' }} />
+                                <img src='/assets/voice-call-icon.png' alt='voice call' style={{ width: '35px', cursor: 'pointer' }} onClick={() => websiteUtils.sendMessageToWS({ op: WebSocketOP.CALL_CREATE, d: { channelID, type: 'voice' } })} />
+                                <img src='/assets/video-call-icon.png' alt='video call' style={{ width: '30px', marginLeft: '10px', marginRight: '15px', cursor: 'pointer' }} onClick={() => websiteUtils.sendMessageToWS({ op: WebSocketOP.CALL_CREATE, d: { channelID, type: 'video' } })} />
                             </>
                         ) : (
                             <>
-                                <p style={{ cursor: 'pointer', scale: '2' }}>+</p>
                                 <img src='/assets/friends-icon.png' style={{ cursor: 'pointer', height: '40px', marginLeft: '20px' }} onClick={() => setDisplayGroupMembers(true)} />
                                 <img
                                     src='/assets/exit-icon.png'
@@ -156,7 +153,20 @@ const Channel = (props: any) => {
                         )}
                     </div>
                 </div>
-                <div className='msg-channel-msgs-div'>
+                <div
+                    className='msg-channel-msgs-div'
+                    onScroll={() => {
+                        const messagesDiv = document.getElementsByClassName('msg-channel-msgs-div')[0];
+
+                        if (messagesDiv.scrollTop === 0 && messages.length % 50 === 0) {
+                            (async () => {
+                                const messagesData = (await superagent.get(`/api/channels/${channelID}/messages?before=${messages[0].id}`)).body;
+
+                                setMessages((messages) => [...messagesData.sort((a: Message, b: Message) => Number(a.sentAt) - Number(b.sentAt)), ...messages]);
+                            })();
+                        }
+                    }}
+                >
                     {groupMessagesByUser(messages)?.map((messageGroup, index) => {
                         return (
                             <div key={index}>
