@@ -274,7 +274,16 @@ router.delete('/channels/:channelID/members/:memberID', makeRateLimiter(60), han
 
 router.get('/channels/:channelID/messages', makeRateLimiter(60), handleAuthorizationCheck, async (req, res) => {
     const { channelID } = req.params;
-    const { content } = req.query;
+    const { before } = req.query;
+
+    let whereQuery = 'WHERE channel_id = $1';
+    const values = [channelID];
+
+    if (before) {
+        whereQuery += ' AND sent_at < $2';
+
+        values.push(before as string);
+    }
 
     const messages = (
         await db.query(
@@ -292,10 +301,12 @@ router.get('/channels/:channelID/messages', makeRateLimiter(60), handleAuthoriza
                     max_alive_time AS "maxAliveTime",
                     unread_users AS "unreadUsers"
                 FROM messages
-                WHERE channel_id = $1${content ? ' AND content LIKE $2' : ''}
-                ORDER BY sent_at DESC;
+                ${whereQuery}
+                ORDER BY sent_at DESC
+                LIMIT 50
+                OFFSET ${before ? 50 : 0};
             `,
-            content ? [channelID, `%${content}%`] : [channelID]
+            values
         )
     ).rows;
 
@@ -703,8 +714,8 @@ router.patch('/friends/:username', makeRateLimiter(60), handleAuthorizationCheck
                     d: {
                         id: channelID,
                         users: [req.session.user.id, userID],
-                        name: id === userID ? username : req.session.user.username,
-                        icon: id === userID ? userData.avatar : friendsInfo.avatar,
+                        name: id === userID ? req.session.user.username : username,
+                        icon: id === userID ? friendsInfo.avatar : userData.avatar,
                         lastActiveAt,
                         type: 'dm',
                     },

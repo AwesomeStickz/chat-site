@@ -181,7 +181,7 @@ io.on('connection', (socket) => {
                 break;
             }
             case WebSocketOP.CALL_CREATE: {
-                const { channelID } = message.d;
+                const { channelID, type } = message.d;
 
                 const otherUserInThisChannel = (
                     await db.query(
@@ -208,7 +208,7 @@ io.on('connection', (socket) => {
                 const connsForOtherUser = wsConnections.get(otherUserInThisChannel) || [];
 
                 for (const con of connsForOtherUser) {
-                    con.socket.send({ op: WebSocketOP.CALL_CREATE, d: { channelID, username: userData.find((user: any) => user.id === ids.user).username } });
+                    con.socket.send({ op: WebSocketOP.CALL_CREATE, d: { channelID, username: userData.find((user: any) => user.id === ids.user).username, type } });
                 }
 
                 const connsForThisUser = wsConnections.get(ids.user) || [];
@@ -220,7 +220,7 @@ io.on('connection', (socket) => {
                 break;
             }
             case WebSocketOP.CALL_ACCEPT: {
-                const { channelID } = message.d;
+                const { channelID, type } = message.d;
 
                 const otherUserInThisChannel = (
                     await db.query(
@@ -236,7 +236,7 @@ io.on('connection', (socket) => {
                 const connsForOtherUser = wsConnections.get(otherUserInThisChannel) || [];
 
                 for (const con of connsForOtherUser) {
-                    con.socket.send({ op: WebSocketOP.CALL_ACCEPT, d: { channelID } });
+                    con.socket.send({ op: WebSocketOP.CALL_ACCEPT, d: { channelID, type } });
                 }
 
                 break;

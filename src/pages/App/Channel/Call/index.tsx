@@ -1,5 +1,4 @@
 import { useEffect, useLayoutEffect, useState } from 'react';
-import { useHistory } from 'react-router-dom';
 import { websiteUtils, wsMessageListeners } from '../../../../utils/websiteUtils';
 import { WebSocketEvent, WebSocketOP } from '../../../../utils/websocketEvents';
 import './Call.css';
@@ -30,7 +29,8 @@ const otherUserFocusStyle = {
 const Call = (props: any) => {
     const { channelID } = props.match.params;
 
-    const history = useHistory();
+    const query = new URLSearchParams(window.location.search);
+    const isVideoCall = query.get('type') === 'video';
 
     const [wsMessageListenerID, setWSMessageListenerID] = useState('');
     const [focusCurrentUser, setFocusCurrentUser] = useState(false);
@@ -42,14 +42,11 @@ const Call = (props: any) => {
     useEffect(() => {
         // @ts-expect-error
         const peer: any = new Peer();
-        // TODO: Fix this
-        // const peer: any = new Peer(constants.peerJSConfig);
-
         const peerConnections: any = {};
 
         navigator.mediaDevices
             .getUserMedia({
-                video: true,
+                video: isVideoCall,
                 audio: true,
             })
             .then((stream) => {
@@ -121,7 +118,7 @@ const Call = (props: any) => {
 
                 clearInterval(pingIntervalID);
 
-                history.push(`/app/channels/${channelID}`);
+                window.location.href = `/app/channels/${channelID}`;
             }
         });
 
@@ -140,7 +137,7 @@ const Call = (props: any) => {
 
     return (
         <div className='call-div'>
-            <h1 style={{ textAlign: 'center' }}>In Call</h1>
+            <h1 style={{ textAlign: 'center' }}>In {isVideoCall ? 'Video' : 'Voice'} Call</h1>
             <div id='videoDiv'>
                 <video id='myVid' autoPlay muted onClick={() => setFocusCurrentUser(!focusCurrentUser)} style={focusCurrentUser ? currentUserFocusStyle : otherUserFocusStyle} />
                 <video id='otherUserVid' autoPlay onClick={() => setFocusCurrentUser(!focusCurrentUser)} style={focusCurrentUser ? otherUserFocusStyle : currentUserFocusStyle} />
@@ -155,15 +152,17 @@ const Call = (props: any) => {
                 >
                     {mutedData.me ? 'Unmute' : 'Mute'}
                 </button>
-                <button
-                    onClick={() => {
-                        toggleVideo(myVideoStream);
+                {isVideoCall && (
+                    <button
+                        onClick={() => {
+                            toggleVideo(myVideoStream);
 
-                        setCamOnData({ ...camOnData, me: !camOnData.me });
-                    }}
-                >
-                    {camOnData.me ? 'Turn Camera Off' : 'Turn Camera On'}
-                </button>
+                            setCamOnData({ ...camOnData, me: !camOnData.me });
+                        }}
+                    >
+                        {camOnData.me ? 'Turn Camera Off' : 'Turn Camera On'}
+                    </button>
+                )}
                 <button
                     onClick={() => {
                         toggleAudio(otherUserVideoStream);
@@ -173,20 +172,29 @@ const Call = (props: any) => {
                 >
                     {mutedData.other ? 'Enable Speaker' : 'Disable Speaker'}
                 </button>
+                {isVideoCall && (
+                    <button
+                        onClick={() => {
+                            const video = document.getElementById('myVid') as HTMLVideoElement;
+
+                            const shouldHide = video.style.display !== 'none';
+
+                            video.style.display = shouldHide ? 'none' : 'block';
+
+                            setFocusCurrentUser(shouldHide ? true : false);
+                        }}
+                    >
+                        Hide My Video
+                    </button>
+                )}
                 <button
+                    className='group-create-cancel-btn'
                     onClick={() => {
-                        const video = document.getElementById('myVid') as HTMLVideoElement;
+                        websiteUtils.sendMessageToWS({ op: WebSocketOP.CALL_END, d: { channelID } });
 
-                        const shouldHide = video.style.display !== 'none';
-
-                        video.style.display = shouldHide ? 'none' : 'block';
-
-                        setFocusCurrentUser(shouldHide ? true : false);
+                        window.location.href = `/app/channels/${channelID}`;
                     }}
                 >
-                    Hide My Video
-                </button>
-                <button className='group-create-cancel-btn' onClick={() => websiteUtils.sendMessageToWS({ op: WebSocketOP.CALL_END, d: { channelID } })}>
                     End Call
                 </button>
             </div>
